@@ -7,12 +7,12 @@ const verifyToken = (req, res, next) => {
   try {
     // Lấy token từ header
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({
-        success: false,
-        message: "Không tìm thấy token xác thực",
-      });
-    }
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({
+      success: false,
+      message: "Token không hợp lệ hoặc không tồn tại",
+    });
+  }
 
     // Kiểm tra format của token
     const token = authHeader.split(" ")[1];
@@ -30,13 +30,14 @@ const verifyToken = (req, res, next) => {
     );
 
     // Lưu thông tin user vào request
-    req.user = decoded;
+req.user = {
+  userId: decoded.userId,
+  email: decoded.email,
+  role: decoded.role,
+};
 
-    // Log để debug
-    console.log("Xác thực token thành công:", {
-      userId: decoded.user_id,
-      username: decoded.username,
-    });
+console.log("✅ Xác thực token thành công:", req.user);
+
 
     next();
   } catch (error) {

@@ -61,7 +61,7 @@ exports.login = async (req, res) => {
     if (!isMatch) return res.status(401).json({ error: 'Mật khẩu sai' });
 
     // Tạo token với role của user
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { userId: user.user_id, email: user.email ,role: user.role },  // Thêm role vào JWT
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
@@ -79,7 +79,7 @@ exports.login = async (req, res) => {
       success: true,
       message: "Đăng nhập thành công",
       data: {
-        token,
+        accessToken,
         refreshToken,
         user: {
           user_id: user.user_id,
@@ -194,7 +194,7 @@ exports.refreshToken = async (req, res) => {
 
       const user = results[0];
 
-      const token = jwt.sign(
+      const accessToken = jwt.sign(
         { userId: user.user_id, email: user.email, role: user.role },
         process.env.JWT_SECRET,
         { expiresIn: '1h' }
@@ -209,11 +209,12 @@ exports.refreshToken = async (req, res) => {
       res.json({
         success: true,
         data: {
-          token,
+          accessToken,
           refreshToken:refreshToken,
           user: {
             user_id:user.user_id,
             email: user.email,
+            username: user.username,
             role: user.role,
             userName: user.userName,
           },

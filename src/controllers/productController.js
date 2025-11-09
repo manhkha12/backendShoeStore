@@ -258,7 +258,7 @@ exports.searchProducts = async (req, res) => {
       WHERE name LIKE ? OR brand LIKE ? OR description LIKE ?
     `, [searchPattern, searchPattern, searchPattern]);
 
-    res.json({ products: results });
+    res.json({ data: results });
   } catch (error) {
     res.status(500).json({ error: 'Lỗi khi tìm kiếm sản phẩm' });
   }

@@ -2,12 +2,14 @@ const path = require("path");
 const fs = require("fs");
 const db = require("../config/db");
 
-const BASE_URL = "http://10.0.2.2:5000"; // Cấu hình URL backend (thay đổi nếu cần)
+const BASE_URL = "http://10.0.2.2:5001"; // Cấu hình URL backend (thay đổi nếu cần)
 
 const getProductImage = async (req, res) => {
   try {
     const { filename } = req.params;
-    const imagePath = path.join(__dirname, "../uploads", filename);
+    const imagePath = path.join(__dirname, "../../uploads", filename);
+    console.log("IMAGE PATH:", imagePath);
+
 
     if (!fs.existsSync(imagePath)) {
       return res.status(404).json({
