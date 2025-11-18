@@ -149,12 +149,20 @@
 
 const db = require('../config/db'); // pool từ mysql2/promise
 
-const BASE_URL = "http://10.0.2.2:5000";
+const BASE_URL = "http://10.0.2.2:5001";
 
 // Lấy tất cả sản phẩm
 exports.getAllProducts = async (req, res) => {
   try {
-    const [products] = await db.query('SELECT * FROM products');
+    const [products] = await db.query(`
+      SELECT 
+        p.*,
+        COALESCE(AVG(r.rating), 0) AS avg_rating,
+        COALESCE(COUNT(r.review_id), 0) AS rating_count
+      FROM products p
+      LEFT JOIN reviews r ON p.product_id = r.product_id
+      GROUP BY p.product_id
+    `);
     res.json({ success: true, data: products });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -176,6 +184,26 @@ exports.getProductById = async (req, res) => {
     const [variants] = await db.query('SELECT * FROM productvariants WHERE product_id = ?', [product.product_id]);
 
     res.json({ success: true, data: { product, category, variants } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getTopRatedProducts = async (req, res) => {
+  try {
+    const [products] = await db.query(`
+      SELECT 
+          p.*,
+          AVG(r.rating) AS avg_rating,
+          COUNT(r.review_id) AS rating_count
+      FROM products p
+      LEFT JOIN reviews r ON p.product_id = r.product_id
+      GROUP BY p.product_id
+      ORDER BY avg_rating DESC, rating_count DESC
+      LIMIT 4
+    `);
+
+    res.json({ success: true, data: products });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

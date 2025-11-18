@@ -1,5 +1,4 @@
 const db = require('../config/db');
-
 // // ✅ Lấy danh sách sản phẩm trong giỏ hàng của user
 // exports.getCart = async (req, res) => {
 //     const userId = req.params.userId;
@@ -21,14 +20,12 @@ const db = require('../config/db');
 //             JOIN products p ON pv.product_id = p.product_id
 //             WHERE c.user_id = ?
 //         `, [userId]);
-
 //         res.json({succes :true,data:{results},});
 //     } catch (err) {
 //         console.error("Lỗi khi lấy danh sách sản phẩm trong giỏ hàng:", err);
 //         res.status(500).json({ error: err.message });
 //     }
 // };
-
 // ✅ Lấy danh sách sản phẩm trong giỏ hàng của user (gộp variant trùng)
 exports.getCart = async (req, res) => {
     const userId = req.params.userId;
@@ -55,13 +52,12 @@ exports.getCart = async (req, res) => {
             ...item,
             quantity: Number(item.quantity)  // ép quantity thành int
         }));
-        res.json({ success: true, data: { results:fixedResults } });
+        res.json({ success: true, data: fixedResults });
     } catch (err) {
         console.error("Lỗi khi lấy danh sách sản phẩm trong giỏ hàng:", err);
         res.status(500).json({ error: err.message });
     }
 };
-
 // ✅ Thêm sản phẩm vào giỏ hàng (theo variant_id)
 exports.addToCart = async (req, res) => {
     const { user_id, variant_id, quantity } = req.body;
@@ -71,14 +67,12 @@ exports.addToCart = async (req, res) => {
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE quantity = quantity + ?
         `, [user_id, variant_id, quantity, quantity]);
-
         res.json({ message: 'Thêm vào giỏ hàng thành công' });
     } catch (err) {
         console.error("Lỗi khi thêm vào giỏ hàng:", err);
         res.status(500).json({ error: err.message });
     }
 };
-
 // ✅ Cập nhật số lượng trong giỏ
 exports.updateCart = async (req, res) => {
     const cartId = req.params.id;
@@ -94,7 +88,6 @@ exports.updateCart = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
-
 // ✅ Xóa sản phẩm khỏi giỏ hàng
 exports.deleteFromCart = async (req, res) => {
     const cartId = req.params.id;
