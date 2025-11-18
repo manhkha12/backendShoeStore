@@ -5,7 +5,7 @@ exports.getUserOrders = async (req, res) => {
     const userId = req.user.userId; // Lấy userId từ token JWT
     try {
         const [results] = await db.query('SELECT * FROM orders WHERE user_id = ?', [userId]);
-        res.json({ orders: results });
+        res.json({ data: results });
     } catch (err) {
         console.error("Lỗi khi lấy danh sách đơn hàng:", err);
         res.status(500).json({ error: 'Lỗi truy vấn database' });
@@ -54,7 +54,7 @@ exports.createOrder = async (req, res) => {
 // Lấy chi tiết đơn hàng
 exports.getOrder = async (req, res) => {
     const orderId = req.params.id;
-    const userId = req.user.userId; // Lấy user từ token
+    const userId = req.user.userId; 
     console.log("🛠️ Debug: orderId =", orderId, "userId =", userId);
 
     const query = `
@@ -89,7 +89,7 @@ exports.getOrder = async (req, res) => {
                 price: row.price,
             }))
         };
-        res.json(order);
+        res.json({data:order});
     } catch (err) {
         console.error("Lỗi khi lấy đơn hàng:", err);
         res.status(500).json({ error: "Lỗi khi lấy đơn hàng" });
@@ -137,7 +137,7 @@ exports.getOrdersByStatus = async (req, res) => {
 
     try {
         const [results] = await db.query("SELECT * FROM orders WHERE user_id = ? AND status = ?", [userId, status]);
-        res.json({ orders: results });
+        res.json({ data: results });
     } catch (err) {
         console.error("Lỗi khi lấy đơn hàng theo trạng thái:", err);
         res.status(500).json({ error: "Lỗi truy vấn database" });
@@ -154,7 +154,7 @@ exports.getAllOrders = async (req, res) => {
             JOIN users u ON o.user_id = u.user_id
             ORDER BY o.created_at DESC
         `);
-        res.json({ orders: results });
+        res.json({ data: results });
     } catch (err) {
         console.error("Lỗi khi lấy danh sách tất cả đơn hàng:", err);
         res.status(500).json({ error: "Lỗi khi lấy danh sách đơn hàng" });

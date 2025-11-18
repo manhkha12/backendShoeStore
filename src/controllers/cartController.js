@@ -55,7 +55,7 @@ exports.getCart = async (req, res) => {
             ...item,
             quantity: Number(item.quantity)  // ép quantity thành int
         }));
-        res.json({ success: true, data: { results:fixedResults } });
+        res.json({ success: true, data: fixedResults });
     } catch (err) {
         console.error("Lỗi khi lấy danh sách sản phẩm trong giỏ hàng:", err);
         res.status(500).json({ error: err.message });
