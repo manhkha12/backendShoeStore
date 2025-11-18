@@ -1,5 +1,4 @@
 const VNPayService = require("../services/vnpay.service.js");
-const OrderModel = require("../models/order.model.js");
 
 async function generateQRVNPay(req, res) {
     const { orderId, amount } = req.body;
@@ -37,26 +36,34 @@ async function handleVnpayReturn(req, res) {
     const orderId = query["vnp_TxnRef"];
     const responseCode = query["vnp_ResponseCode"];
 
+    // Thanh toán thành công
     if (responseCode === "00") {
         try {
-            await OrderModel.updateOne(
-                { _id: orderId },
-                {
-                    $set: {
-                        payment_status: "Success",
-                        delivery_status: "OrderPaid",
-                    },
-                }
+            // SSQL UPDATE
+            await db.execute(
+                "UPDATE orders SET status = ? WHERE order_id = ?",
+                ["Success", orderId]
             );
 
             return res.redirect(
                 `http://localhost:5173/payment-success?orderId=${orderId}`
             );
         } catch (err) {
+            console.error("DB error:", err);
             return res.redirect(
                 `http://localhost:5173/payment-failed?orderId=${orderId}&error=update_failed`
             );
         }
+    }
+
+    // Thanh toán thất bại
+    try {
+        await db.execute(
+            "UPDATE orders SET status = ? WHERE id = ?",
+            ["Failed", orderId]
+        );
+    } catch (err) {
+        console.error("DB error:", err);
     }
 
     return res.redirect(
