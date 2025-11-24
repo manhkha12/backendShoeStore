@@ -41,17 +41,28 @@ async function handleVnpayReturn(req, res) {
   // Nếu thanh toán thành công
   if (responseCode === "00") {
     try {
+      const [details] = await db.query(
+        `SELECT variant_id, quantity FROM orderdetails WHERE order_id=?`,
+        [orderId]
+      );
+
+      for (const item of details) {
+        await db.query(
+          "UPDATE productvariants SET stock = stock - ? WHERE variant_id = ?",
+          [item.quantity, item.variant_id]
+        );
+      }
       // 1️⃣ Cập nhật trạng thái đơn hàng
       await db.query("UPDATE orders SET status = ? WHERE order_id = ?", [
-        "Paid",
+        "processing",
         orderId,
       ]);
 
       // 2️⃣ Ghi vào bảng PAYMENT
       await db.query(
-        `INSERT INTO payment (order_id, payment_method, payment_status, transaction_id)
+        `INSERT INTO payments (order_id, payment_method, payment_status, transaction_id)
                  VALUES (?, ?, ?, ?)`,
-        [orderId, "vnpay", "Success", transactionNo]
+        [orderId, "bank_transfer", "Success", transactionNo]
       );
 
       return res.redirect(
