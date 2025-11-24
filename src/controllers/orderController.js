@@ -1,16 +1,83 @@
 const db = require('../config/db');
 
 // Lấy danh sách đơn hàng của người dùng
+// exports.getUserOrders = async (req, res) => {
+//     const userId = req.user.userId; // Lấy userId từ token JWT
+//     try {
+//         const [results] = await db.query('SELECT * FROM orders WHERE user_id = ?', [userId]);
+//         res.json({ data: results });
+//     } catch (err) {
+//         console.error("Lỗi khi lấy danh sách đơn hàng:", err);
+//         res.status(500).json({ error: 'Lỗi truy vấn database' });
+//     }
+// };
+
+
 exports.getUserOrders = async (req, res) => {
-    const userId = req.user.userId; // Lấy userId từ token JWT
+    const userId = req.user.userId;
+
     try {
-        const [results] = await db.query('SELECT * FROM orders WHERE user_id = ?', [userId]);
-        res.json({ data: results });
+        const [results] = await db.query(
+            `SELECT 
+                o.order_id,
+                o.user_id,
+                o.total_price,
+                o.status,
+                o.created_at,
+                p.name AS product_name,
+                pv.size,
+                pv.color,
+                od.quantity,
+                od.price,
+                p.image,
+                p.brand
+            FROM orders o
+            JOIN orderdetails od ON o.order_id = od.order_id
+            JOIN productvariants pv ON od.variant_id = pv.variant_id
+            JOIN products p ON pv.product_id = p.product_id
+            WHERE o.user_id = ?`,
+            [userId]
+        );
+
+        // ---- Grouping ----
+        const ordersMap = {};
+
+        results.forEach(row => {
+            const orderId = row.order_id;
+
+            if (!ordersMap[orderId]) {
+                ordersMap[orderId] = {
+                    order_id: row.order_id,
+                    user_id: row.user_id,
+                    total_price: row.total_price,
+                    status: row.status,
+                    created_at: row.created_at,
+                    items: []
+                };
+            }
+
+            ordersMap[orderId].items.push({
+                product_name: row.product_name,
+                size: row.size,
+                color: row.color,
+                quantity: row.quantity,
+                price: row.price,
+                image: row.image,
+                brand: row.brand
+            });
+        });
+
+        res.json({ data: Object.values(ordersMap) });
+
     } catch (err) {
         console.error("Lỗi khi lấy danh sách đơn hàng:", err);
         res.status(500).json({ error: 'Lỗi truy vấn database' });
     }
 };
+
+
+
+
 
 exports.createOrder = async (req, res) => {
   const userId = req.user?.userId;
