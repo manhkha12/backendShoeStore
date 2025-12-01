@@ -58,6 +58,7 @@ exports.login = async (req, res) => {
 
     const user = results[0];
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) return res.status(401).json({ error: 'Mật khẩu sai' });
 
     // Tạo token với role của user

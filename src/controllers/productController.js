@@ -148,9 +148,29 @@
 // };
 
 const db = require('../config/db'); // pool từ mysql2/promise
+const cloudinary = require('cloudinary').v2;
 
+// Cấu hình Cloudinary (Nên đặt trong file config riêng hoặc .env)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 const BASE_URL = "http://10.0.2.2:5000";
 
+const uploadToCloudinary = async (file) => {
+  try {
+    // Upload file từ đường dẫn tạm (req.file.path)
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: 'shoe_store_products', // Tên thư mục trên Cloudinary
+      use_filename: true,
+    });
+    return result.secure_url; // Trả về link ảnh online
+  } catch (error) {
+    console.error("Cloudinary upload error:", error);
+    throw new Error('Lỗi khi upload ảnh');
+  }
+};
 // Lấy tất cả sản phẩm
 exports.getAllProducts = async (req, res) => {
   try {
@@ -184,10 +204,16 @@ exports.getProductById = async (req, res) => {
 // Tạo sản phẩm mới
 exports.createProduct = async (req, res) => {
   try {
-    const { name, description, price, category_id, brand, stock, image } = req.body;
+    const { name, description, price, category_id, brand, stock } = req.body;
+    let image = req.body.image; // Lấy link ảnh nếu gửi dạng text
+
+    // Nếu có file upload, ưu tiên dùng file và up lên Cloudinary
+    if (req.file) {
+      image = await uploadToCloudinary(req.file);
+    }
 
     if (!name || !price) {
-      return res.status(400).json({ error: 'Thiếu thông tin sản phẩm' });
+      return res.status(400).json({ error: 'Thiếu thông tin sản phẩm (Tên, Giá)' });
     }
 
     const [result] = await db.query(
@@ -195,9 +221,14 @@ exports.createProduct = async (req, res) => {
       [name, description, price, category_id, brand, stock, image]
     );
 
-    res.status(201).json({ message: 'Sản phẩm đã được thêm', productId: result.insertId });
+    res.status(201).json({ 
+      success: true,
+      message: 'Sản phẩm đã được thêm', 
+      productId: result.insertId,
+      imageUrl: image // Trả về link ảnh để FE cập nhật
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -205,12 +236,19 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body }; // Copy body để xử lý
 
-    if (!Object.keys(updates).length) {
+    // Xử lý upload ảnh mới nếu có
+    if (req.file) {
+      const imageUrl = await uploadToCloudinary(req.file);
+      updates.image = imageUrl; // Cập nhật field image
+    }
+
+    if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'Không có dữ liệu để cập nhật' });
     }
 
+    // Tạo câu query động
     const fields = Object.keys(updates).map(field => `${field} = ?`).join(', ');
     const values = Object.values(updates);
 
@@ -220,12 +258,12 @@ exports.updateProduct = async (req, res) => {
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy sản phẩm' });
+      return res.status(404).json({ success: false, error: 'Không tìm thấy sản phẩm' });
     }
 
-    res.json({ message: 'Sản phẩm đã được cập nhật' });
+    res.json({ success: true, message: 'Sản phẩm đã được cập nhật' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 

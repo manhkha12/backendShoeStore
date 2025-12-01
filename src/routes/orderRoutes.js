@@ -9,7 +9,7 @@ router.get('/user/:user_id', authenticateToken, getUserOrders);
 // ✅ Cũng nên thêm middleware này cho các route cần userId
 router.post('/', authenticateToken, createOrder);
 router.get('/:id', authenticateToken, getOrder);
-router.put('/:id', authenticateToken, updateOrderStatus);
+router.put('/:id', authenticateToken, updateOrderStatus);   
 router.delete('/:id', authenticateToken, deleteOrder);
 
 router.get("/user/orders/:status", authenticateToken, getOrdersByStatus);
