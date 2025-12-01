@@ -30,8 +30,7 @@ class OrderBuilder {
             shipping_fee: 0,
             discount_amount: 0,
             final_price: 0,
-            // DB SQL yêu cầu payment_method thuộc enum cụ thể
-            payment_method: "cash_on_delivery", 
+            payment_method: "cash_on_delivery",
             status: "pending",
             created_at: new Date()
         };
@@ -44,21 +43,18 @@ class OrderBuilder {
     }
 
     setPaymentMethod(method) {
-        // Map từ keyword ngắn gọn sang Enum trong SQL
         const methodMap = {
             'COD': 'cash_on_delivery',
             'BANK_TRANSFER': 'bank_transfer',
             'CREDIT_CARD': 'credit_card',
             'PAYPAL': 'paypal'
         };
-
-        // Nếu client gửi đúng key map thì lấy value, không thì giữ nguyên (hoặc mặc định)
         this.order.payment_method = methodMap[method] || method || 'cash_on_delivery';
         return this;
     }
 
     addValidatedItems(validatedItems) {
-        const newItems = validatedItems.map(item => 
+        const newItems = validatedItems.map(item =>
             new OrderItem(item.variant_id, item.name, item.quantity, item.price)
         );
         this.order.items.push(...newItems);
@@ -84,7 +80,6 @@ class OrderBuilder {
     calculateTotals() {
         this.order.total_item_price = this.order.items.reduce((sum, item) => sum + item.subtotal, 0);
 
-        // Logic phí ship mặc định (nếu chưa set)
         if (this.order.shipping_fee === 0 && this.order.total_item_price < 1000000) {
             this.order.shipping_fee = 30000;
         }
@@ -92,7 +87,6 @@ class OrderBuilder {
             this.order.shipping_fee = 0;
         }
 
-        // Tính giá cuối cùng để lưu vào cột `total_price` trong bảng orders
         this.order.final_price = (this.order.total_item_price + this.order.shipping_fee) - this.order.discount_amount;
         if (this.order.final_price < 0) this.order.final_price = 0;
 
@@ -136,7 +130,6 @@ class OrderDirector {
     }
 
     async makeSummerComboOrder(userId, quantity, paymentMethod) {
-        // Giả sử Combo: Variant 1 và Variant 2
         const comboItems = [
             { variant_id: 1, quantity: 1 * quantity },
             { variant_id: 2, quantity: 1 * quantity }
@@ -186,8 +179,6 @@ class OrderService {
         await connection.beginTransaction();
 
         try {
-            // 1. INSERT ORDERS
-            // SQL chỉ có cột: order_id, user_id, total_price, status, created_at
             const [orderResult] = await connection.query(
                 `INSERT INTO orders (user_id, total_price, status, created_at) 
                  VALUES (?, ?, ?, ?)`,
@@ -195,7 +186,6 @@ class OrderService {
             );
             const orderId = orderResult.insertId;
 
-            // 2. INSERT ORDER DETAILS
             const detailValues = orderData.items.map(item => [
                 orderId, item.variant_id, item.quantity, item.price
             ]);
@@ -206,15 +196,12 @@ class OrderService {
                 );
             }
 
-            // 3. INSERT PAYMENTS (Bảng riêng trong SQL của bạn)
-            // SQL payment_method enum: 'credit_card','paypal','bank_transfer','cash_on_delivery'
             await connection.query(
                 `INSERT INTO payments (order_id, payment_method, payment_status, created_at)
                  VALUES (?, ?, 'pending', ?)`,
                 [orderId, orderData.payment_method, orderData.created_at]
             );
 
-            // 4. UPDATE STOCK
             for (const item of orderData.items) {
                 await connection.query(
                     "UPDATE productvariants SET stock = stock - ? WHERE variant_id = ?",
@@ -233,9 +220,9 @@ class OrderService {
         }
     }
 
-    // --- CÁC HÀM GET / DELETE GIỮ NGUYÊN ---
+    // --- CÁC HÀM GET / DELETE ---
+
     async getOrderDetail(orderId) {
-        // Join 3 bảng: orders, orderdetails, payments
         const [orders] = await this.db.query(`
             SELECT o.*, pay.payment_method, pay.payment_status 
             FROM orders o
@@ -246,7 +233,7 @@ class OrderService {
         if (!orders.length) return null;
 
         const [items] = await this.db.query(
-            `SELECT od.*, p.name as product_name, v.size, v.color
+            `SELECT od.*, p.name as product_name, p.image, v.size, v.color
              FROM orderdetails od
              JOIN productvariants v ON od.variant_id = v.variant_id
              JOIN products p ON v.product_id = p.product_id
@@ -256,14 +243,45 @@ class OrderService {
         return { ...orders[0], items };
     }
 
+    // 🔴 ĐÃ CẬP NHẬT: LẤY KÈM ITEMS
     async getUserOrders(userId) {
-        const [rows] = await this.db.query("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC", [userId]);
-        return rows;
+        // Bước 1: Lấy danh sách Order chính
+        const [orders] = await this.db.query(`
+            SELECT o.order_id, o.total_price, o.status, o.created_at,
+                   pay.payment_method, pay.payment_status
+            FROM orders o
+            LEFT JOIN payments pay ON o.order_id = pay.order_id
+            WHERE o.user_id = ? 
+            ORDER BY o.created_at DESC
+        `, [userId]);
+
+        if (orders.length === 0) return [];
+
+        // Bước 2: Lấy danh sách ID để query items
+        const orderIds = orders.map(order => order.order_id);
+
+        // Bước 3: Lấy Items cho tất cả các order trên (dùng IN)
+        const [items] = await this.db.query(`
+            SELECT od.order_id, od.variant_id, od.quantity, od.price,
+                   p.name as product_name, p.image, v.size, v.color
+            FROM orderdetails od
+            JOIN productvariants v ON od.variant_id = v.variant_id
+            JOIN products p ON v.product_id = p.product_id
+            WHERE od.order_id IN (?)
+        `, [orderIds]);
+
+        // Bước 4: Map items vào đúng order của nó
+        const result = orders.map(order => {
+            return {
+                ...order,
+                items: items.filter(item => item.order_id === order.order_id)
+            };
+        });
+
+        return result;
     }
 
     async updateOrderStatus(orderId, status) {
-        // Cần đảm bảo status gửi lên khớp với Enum trong SQL
-        // Enum: 'pending','processing','shipped','delivered','canceled'
         const [result] = await this.db.query("UPDATE orders SET status = ? WHERE order_id = ?", [status, orderId]);
         if (result.affectedRows === 0) throw new Error("Đơn hàng không tồn tại");
         return true;
@@ -276,6 +294,8 @@ class OrderService {
     }
 
     async getOrdersByStatus(userId, status) {
+        // Cũng nên áp dụng logic lấy items tương tự nếu cần hiển thị chi tiết ở trang lọc status
+        // Ở đây mình làm mẫu cho getUserOrders trước
         const [rows] = await this.db.query("SELECT * FROM orders WHERE user_id = ? AND status = ? ORDER BY created_at DESC", [userId, status]);
         return rows;
     }

@@ -57,7 +57,9 @@ exports.login = async (req, res) => {
     if (results.length === 0) return res.status(401).json({ error: 'Email không tồn tại' });
 
     const user = results[0];
+    console.log(await bcrypt.hash(password, 10))
     const isMatch = await bcrypt.compare(password, user.password);
+    
 
     if (!isMatch) return res.status(401).json({ error: 'Mật khẩu sai' });
 
