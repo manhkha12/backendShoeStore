@@ -81,40 +81,71 @@ exports.getUserOrders = async (req, res) => {
 
 exports.createOrder = async (req, res) => {
   const userId = req.user?.userId;
-  const { total_price, items } = req.body;
+  const { total_price, items, payment_method } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0 || !total_price) {
     return res.status(400).json({ error: "Thiếu thông tin đơn hàng hoặc danh sách sản phẩm" });
   }
 
+  const conn = await db.getConnection();
+  await conn.beginTransaction();
+
   try {
     // Tạo đơn hàng
-    const [result] = await db.query(
-      "INSERT INTO orders (user_id, total_price) VALUES (?, ?)",
-      [userId, total_price]
+    const [orderResult] = await conn.query(
+      "INSERT INTO orders (user_id, total_price, status) VALUES (?, ?, ?)",
+      [userId, total_price, "pending"]
     );
-    const orderId = result.insertId;
+    const orderId = orderResult.insertId;
 
-    // Chuẩn bị dữ liệu để insert vào orderdetails
-    const values = items.map(item => [
+    // Insert vào orderdetails
+    const orderDetails = items.map(item => [
       orderId,
+      item.variant_id,
       item.quantity,
       item.price,
-      item.product_id,
-      item.size,
-      item.color
     ]);
 
-    const queryDetails = `
-      INSERT INTO orderdetails (order_id, quantity, price, product_id, size, color)
-      VALUES ?
-    `;
-    await db.query(queryDetails, [values]);
+    await conn.query(
+      `INSERT INTO orderdetails (order_id, variant_id, quantity, price)
+       VALUES ?`,
+      [orderDetails]
+    );
 
-    res.status(201).json({ message: "Tạo đơn hàng thành công", orderId });
+
+    // Nếu có thanh toán
+    if (payment_method) {
+      await conn.query(
+        `INSERT INTO payments (order_id, payment_method, payment_status)
+         VALUES (?, ?, ?)`,
+        [orderId, payment_method, "pending"]
+      );
+    }
+
+      const variantIds = items.map(item => item.variant_id);
+    await conn.query(
+      `DELETE FROM cart WHERE user_id = ? AND variant_id IN (?)`,
+      [userId, variantIds]
+    );
+
+    // Hoàn tất transaction
+    await conn.commit();
+
+    res.status(201).json({
+      message: "Tạo đơn hàng thành công",
+      data: {
+    orderId: orderId,
+     amount: total_price
+  }
+    });
+
   } catch (err) {
+    // Có lỗi → rollback
+    await conn.rollback();
     console.error("Lỗi khi tạo đơn hàng:", err);
     res.status(500).json({ error: "Lỗi khi tạo đơn hàng" });
+  } finally {
+    conn.release();
   }
 };
 
