@@ -148,33 +148,9 @@
 // };
 
 const db = require('../config/db'); // pool từ mysql2/promise
-const cloudinary = require('cloudinary').v2;
 
-<<<<<<< HEAD
-// Cấu hình Cloudinary (Nên đặt trong file config riêng hoặc .env)
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
 const BASE_URL = "http://10.0.2.2:5000";
-=======
-const BASE_URL = "http://10.0.2.2:5001";
->>>>>>> 489487e32b106b85fcd0647276a92ca4fbf809c8
 
-const uploadToCloudinary = async (file) => {
-  try {
-    // Upload file từ đường dẫn tạm (req.file.path)
-    const result = await cloudinary.uploader.upload(file.path, {
-      folder: 'shoe_store_products', // Tên thư mục trên Cloudinary
-      use_filename: true,
-    });
-    return result.secure_url; // Trả về link ảnh online
-  } catch (error) {
-    console.error("Cloudinary upload error:", error);
-    throw new Error('Lỗi khi upload ảnh');
-  }
-};
 // Lấy tất cả sản phẩm
 exports.getAllProducts = async (req, res) => {
   try {

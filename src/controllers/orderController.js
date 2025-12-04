@@ -22,10 +22,76 @@ const db = require('../config/db');
 // };
 
 
+// exports.getUserOrders = async (req, res) => {
+//     const userId = req.user.userId; // Lấy userId từ token JWT
+//     try {
+//         const [results] = await db.query('SELECT * FROM orders WHERE user_id = ?', [userId]);
+//         res.json({ data: results });
+//     } catch (err) {
+//         console.error("Lỗi khi lấy danh sách đơn hàng:", err);
+//         res.status(500).json({ error: 'Lỗi truy vấn database' });
+//     }
+// };
+
+
 exports.getUserOrders = async (req, res) => {
     const userId = req.user.userId;
 
+    const userId = req.user.userId;
+
     try {
+        const [results] = await db.query(
+            `SELECT 
+                o.order_id,
+                o.user_id,
+                o.total_price,
+                o.status,
+                o.created_at,
+                p.name AS product_name,
+                pv.size,
+                pv.color,
+                od.quantity,
+                od.price,
+                p.image,
+                p.brand
+            FROM orders o
+            JOIN orderdetails od ON o.order_id = od.order_id
+            JOIN productvariants pv ON od.variant_id = pv.variant_id
+            JOIN products p ON pv.product_id = p.product_id
+            WHERE o.user_id = ?`,
+            [userId]
+        );
+
+        // ---- Grouping ----
+        const ordersMap = {};
+
+        results.forEach(row => {
+            const orderId = row.order_id;
+
+            if (!ordersMap[orderId]) {
+                ordersMap[orderId] = {
+                    order_id: row.order_id,
+                    user_id: row.user_id,
+                    total_price: row.total_price,
+                    status: row.status,
+                    created_at: row.created_at,
+                    items: []
+                };
+            }
+
+            ordersMap[orderId].items.push({
+                product_name: row.product_name,
+                size: row.size,
+                color: row.color,
+                quantity: row.quantity,
+                price: row.price,
+                image: row.image,
+                brand: row.brand
+            });
+        });
+
+        res.json({ data: Object.values(ordersMap) });
+
         const [results] = await db.query(
             `SELECT 
                 o.order_id,
@@ -88,9 +154,13 @@ exports.getUserOrders = async (req, res) => {
 
 
 
+
+
+
+
 exports.createOrder = async (req, res) => {
   const userId = req.user?.userId;
-  const { total_price, items, payment_method } = req.body;
+  const { total_price, items, payment_method, payment_method } = req.body;
 >>>>>>> 489487e32b106b85fcd0647276a92ca4fbf809c8
 
     // 2. Lấy dữ liệu input
@@ -107,20 +177,56 @@ exports.createOrder = async (req, res) => {
   const conn = await db.getConnection();
   await conn.beginTransaction();
 
+  const conn = await db.getConnection();
+  await conn.beginTransaction();
+
   try {
     // Tạo đơn hàng
     const [orderResult] = await conn.query(
       "INSERT INTO orders (user_id, total_price, status) VALUES (?, ?, ?)",
       [userId, total_price, "pending"]
+    const [orderResult] = await conn.query(
+      "INSERT INTO orders (user_id, total_price, status) VALUES (?, ?, ?)",
+      [userId, total_price, "pending"]
     );
+    const orderId = orderResult.insertId;
     const orderId = orderResult.insertId;
 
     // Insert vào orderdetails
     const orderDetails = items.map(item => [
+    // Insert vào orderdetails
+    const orderDetails = items.map(item => [
       orderId,
+      item.variant_id,
       item.variant_id,
       item.quantity,
       item.price,
+    ]);
+
+    await conn.query(
+      `INSERT INTO orderdetails (order_id, variant_id, quantity, price)
+       VALUES ?`,
+      [orderDetails]
+    );
+
+
+    // Nếu có thanh toán
+    if (payment_method) {
+      await conn.query(
+        `INSERT INTO payments (order_id, payment_method, payment_status)
+         VALUES (?, ?, ?)`,
+        [orderId, payment_method, "pending"]
+      );
+    }
+
+      const variantIds = items.map(item => item.variant_id);
+    await conn.query(
+      `DELETE FROM cart WHERE user_id = ? AND variant_id IN (?)`,
+      [userId, variantIds]
+    );
+
+    // Hoàn tất transaction
+    await conn.commit();
     ]);
 
     await conn.query(
@@ -156,11 +262,23 @@ exports.createOrder = async (req, res) => {
   }
     });
 
+    res.status(201).json({
+      message: "Tạo đơn hàng thành công",
+      data: {
+    orderId: orderId,
+     amount: total_price
+  }
+    });
+
   } catch (err) {
+    // Có lỗi → rollback
+    await conn.rollback();
     // Có lỗi → rollback
     await conn.rollback();
     console.error("Lỗi khi tạo đơn hàng:", err);
     res.status(500).json({ error: "Lỗi khi tạo đơn hàng" });
+  } finally {
+    conn.release();
   } finally {
     conn.release();
   }

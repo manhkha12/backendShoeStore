@@ -1,6 +1,7 @@
 const VNPayService = require("../services/vnpay.service.js");
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 async function generateQRVNPay(req, res) {
     const { orderId, amount } = req.body;
 
@@ -76,6 +77,8 @@ module.exports = {
     generateQRVNPay,
     handleVnpayReturn,
 =======
+=======
+>>>>>>> 489487e32b106b85fcd0647276a92ca4fbf809c8
 const db = require("../config/db.js");
 
 async function generateQRVNPay(req, res) {
@@ -161,5 +164,8 @@ async function handleVnpayReturn(req, res) {
 module.exports = {
   generateQRVNPay,
   handleVnpayReturn,
+<<<<<<< HEAD
+>>>>>>> 489487e32b106b85fcd0647276a92ca4fbf809c8
+=======
 >>>>>>> 489487e32b106b85fcd0647276a92ca4fbf809c8
 };
