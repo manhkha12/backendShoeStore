@@ -60,8 +60,8 @@ exports.getOrder = async (req, res) => {
 exports.getUserOrders = async (req, res) => {
     const userId = req.user?.userId || req.query.user_id;
     try {
-        const orders = await orderService.getUserOrders(userId);
-        return successResponse(res, { orders }, "Lấy lịch sử đơn hàng thành công");
+        const data = await orderService.getUserOrders(userId);
+        return successResponse(res, data , "Lấy lịch sử đơn hàng thành công");
     } catch (err) {
         return errorResponse(res, err.message);
     }
